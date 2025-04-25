@@ -1,0 +1,39 @@
+import { Router } from "express";
+import conn from '@/db/conn';
+import { check_user } from '@/services/check_user';
+import { v4 as uuidv4 } from 'uuid';
+
+export const consulta_visitantes = Router();
+
+consulta_visitantes.get(
+    '/visitantes/consulta_empresa',
+    async (req, res, next) => {
+        try {
+            const sql = `
+                SELECT * FROM visitantes_dados_empresa
+               `             
+            const [data] = await conn.query(sql)
+            res.status(200).send(data)
+        } catch (err) {
+            next(err)
+        }
+    }
+)
+
+consulta_visitantes.get(
+    '/visitantes/visitantes/consulta_nome',
+    async(req, res, next) => {
+        try {          
+            const sql = `
+                SELECT * FROM visitantes_dados_pessoa
+            `
+            const [data] = await conn.query(sql)
+            res.status(200).send(data)      
+        } catch (err) {   
+            next(err)
+        }
+
+    }
+)
+
+export default consulta_visitantes;
