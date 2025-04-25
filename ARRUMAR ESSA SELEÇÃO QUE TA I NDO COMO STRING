@@ -1,0 +1,264 @@
+import {
+  Alert,
+  Autocomplete,
+  Box,
+  Button,
+  FormControl,
+  FormControlLabel,
+  FormLabel,
+  MenuItem,
+  Paper,
+  Radio,
+  RadioGroup,
+  TextField,
+  Typography
+} from '@mui/material';
+import { useForm, Controller } from 'react-hook-form';
+import axios from '@/services/axios';
+import { useState } from 'react';
+import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
+import ModalCadastroVisita from '@/components/visitantes/ModalCadastroVisita';
+import { useQuery } from 'react-query';
+
+// Componente de Carregamento (BackdropLoading)
+import BackdropLoading from '@/components/BackdropLoading';
+
+const motivos = ['Reunião', 'Visita Técnica'];
+const opcoes = ['Notebook', 'EPI', 'Fotos', 'Fábrica', 'Estacionamento'];
+
+// Lista simples de solicitantes com strings
+const solicitantes = ['sla', 'sla', 'sla'];
+
+export default function CadastroVisita() {
+  const navigate = useNavigate();
+  const [open, setOpenConfirmModal] = useState(false);
+  const [dados, setDados] = useState([]);
+
+  const { register, handleSubmit, control, formState: { errors } } = useForm();
+
+  const handleCloseCadastroVisita = () => {
+    setOpenConfirmModal(false);
+  };
+
+  const confirmarVisita = () => {
+    console.log('to aqui')
+    console.log(dados)
+    toast.promise(
+      axios.post('/visitantes/cadastro_visita', dados),
+      {
+        loading: 'Carregando...',
+        success: (res) => {
+          setOpenConfirmModal(false);
+          navigate('/visitantes/inicial');
+          return res.data.message;
+        },
+        error: (err) => {
+          const mensagemErro = err.response?.data?.message || 'Erro ao salvar';
+          return mensagemErro;
+        }
+      }
+    );
+  };
+
+  const onSubmit = async (dados) => {
+    setDados(dados);
+    setOpenConfirmModal(true);  // Abre o modal de confirmação
+  };
+
+
+  const ErrorAlert = ({ campo }) => campo ? (
+    <Alert variant='outlined' sx={{ mt: 1 }} severity='error'>
+      {campo.message || 'Campo obrigatório'}
+    </Alert>
+  ) : null;
+
+  const { isLoading: isLoadingEmpresa, error: errorEmpresa, data: dataEmpresa } = useQuery(
+    ['Nomes empresas do cadastro de visita'],
+    () => axios.get('/visitantes/consulta_empresa').then((res) => res.data)
+  );
+
+  const { isLoading: isLoadingVisitantes, error: errorVisitantes, data: dataVisitantes } = useQuery(
+    ['Nomes visitantes do cadastro de visita'],
+    () => axios.get('/visitantes/visitantes/consulta_nome').then((res) => res.data)
+  );
+
+  console.log(dataVisitantes);
+
+  if (isLoadingEmpresa || isLoadingVisitantes) return <BackdropLoading />;
+  if (errorEmpresa || errorVisitantes) return <Error error={errorEmpresa?.response?.data || errorVisitantes?.response?.data} />;
+
+  return (
+    <Box sx={{ width: '100%', px: 3, mt: 3 }}>
+      <Typography variant='h3' mb={2}>
+        Cadastro de Visita
+      </Typography>
+
+      <Paper sx={{ p: 4, borderRadius: 5 }}>
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* Nome do Visitante */}
+            <Box>
+              <Controller
+                name="visitante_id"
+                control={control}
+                rules={{ required: true }}
+                render={({ field }) => {
+                  const { onChange, value, ...restField } = field;
+                  return (
+                    <Autocomplete
+                      {...restField}
+                      disableClearable
+                      options={dataVisitantes || []}
+                      getOptionLabel={(option) => option?.nome_completo}
+                      isOptionEqualToValue={(option, value) => option.id === value.id}
+                      renderInput={(params) => <TextField {...params} placeholder="Selecione o visitante" />}
+                      onChange={(_, data) => onChange(data)}
+                    />
+                  );
+                }}
+              />
+              <ErrorAlert campo={errors.visitante_id} />
+            </Box>
+
+            {/* Empresa */}
+            <Box>
+              <Controller
+                name='empresa'
+                control={control}
+                rules={{ required: true }}
+                render={({ field }) => {
+                  const { onChange, value, ...restField } = field;
+                  return (
+                    <Autocomplete
+                      {...restField}
+                      disableClearable
+                      value={value || null}
+                      options={dataEmpresa}
+                      getOptionLabel={(option) => `${option.cnpj} - ${option.razao_social}`}
+                      isOptionEqualToValue={(option, value) => option.uuid === value.uuid}
+                      renderInput={(params) => <TextField {...params} placeholder="Selecione a empresa" />}
+                      onChange={(_, data) => onChange(data)}
+                    />
+                  );
+                }}
+              />
+              <ErrorAlert campo={errors.empresa} />
+            </Box>
+
+            {/* Motivo da Visita */}
+            <Box>
+              <TextField
+                select
+                label='Motivo da Visita'
+                fullWidth
+                defaultValue=''
+                {...register('motivo', { required: true })}
+              >
+                {motivos.map((motivo, index) => (
+                  <MenuItem key={index} value={motivo}>
+                    {motivo}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <ErrorAlert campo={errors.motivo} />
+            </Box>
+
+            {/* Solicitante */}
+            <Box>
+              <TextField
+                select
+                label='Solicitante'
+                fullWidth
+                defaultValue=''
+                {...register('solicitante_id', { required: true })}
+              >
+                {solicitantes.map((s, index) => (
+                  <MenuItem key={index} value={s}>
+                    {s}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <ErrorAlert campo={errors.solicitante_id} />
+            </Box>
+
+            {/* Opções */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              {opcoes.map((item) => (
+                <FormControl
+                  key={item}
+                  component="fieldset"
+                  sx={{ display: 'flex', justifyContent: 'space-between', border: '1px solid #CCC', borderRadius: 2, p: 1 }}
+                >
+                  <FormLabel component="legend" sx={{ fontWeight: 'bold', px: 1 }}>
+                    {item}
+                  </FormLabel>
+                  <Controller
+                    name={item}
+                    control={control}
+                    defaultValue={0 || 1}  
+                    render={({ field }) => (
+                      <RadioGroup row {...field}>
+                        {['sim', 'não'].map((valor) => (
+                          <FormControlLabel
+                            key={valor}
+                            value={valor === 'sim' ? 1 : 0 || valor === 'não' ? 0 : 1}  
+                             
+                            control={<Radio />}
+                            label={valor.charAt(0).toUpperCase() + valor.slice(1)}
+                            sx={{
+                              m: 1,
+                              px: 2,
+                              py: 1,
+                              border: '1px solid #ccc',
+                              borderRadius: '10px',
+                              width: '80px',
+                              height: '50px',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              textAlign: 'center',
+                              '& .MuiRadio-root': {
+                                p: 0,
+                                mr: 1,
+                                color: valor === 'sim' ? '#2e7d32' : '#d32f2f',
+                              },
+                              '& .MuiFormControlLabel-label': {
+                                fontSize: '1.2rem',
+                                fontWeight: '500',
+                              },
+                            }}
+                          />
+                        ))}
+                      </RadioGroup>
+                    )}
+                  />
+                </FormControl>
+              ))}
+            </Box>
+
+
+            {/* Observações */}
+            <Box>
+              <TextField
+                label='Observações'
+                fullWidth
+                {...register('observacoes')}
+              />
+              <ErrorAlert campo={errors.observacoes} />
+            </Box>
+
+            <Button type='submit' variant='contained' fullWidth sx={{ mt: 2, py: 2, fontSize: '1.1rem' }}>
+              Registrar Visita
+            </Button>
+          </Box>
+        </form>
+      </Paper>
+
+      <ModalCadastroVisita
+        open={open}
+        handleClose={handleCloseCadastroVisita}
+        confirm={confirmarVisita}
+      />
+    </Box>
+  );
+}
