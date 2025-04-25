@@ -1,0 +1,141 @@
+import { Router } from "express";
+import conn from '@/db/conn'
+import { check_user } from '@/services/check_user'
+import { v4 as uuidv4 } from 'uuid';
+
+export const criacao_visitantes = Router();
+
+criacao_visitantes.post('/visitantes/cadastro-empresa', async (req, res) => {
+    try {
+
+        const session = await check_user(req);
+        if (!session || !session.session.acessos.includes(100)) {
+            return res.status(401).send({
+                message: 'Sem permissão!'
+            });
+        }
+
+
+        const { razao_social, nome_empresa, cnpj, ramo_atuacao, rua, numero, bairro, cidade, estado, cep } = req.body;
+
+
+        if (!razao_social || !nome_empresa || !cnpj || !ramo_atuacao || !rua || !numero || !bairro || !cidade || !estado || !cep) {
+            return res.status(400).send({ message: 'Todos os campos são obrigatórios!' });
+        }
+
+        const [existeCNPJ] = await conn.query('SELECT * FROM visitantes_dados_empresa WHERE cnpj = ?', [cnpj]);
+
+        if (existeCNPJ.length > 0) {
+            return res.status(409).send({ message: 'CNPJ já cadastrado!' });
+        }
+
+
+        const uuid = uuidv4();
+
+
+        const sql = `
+            INSERT INTO visitantes_dados_empresa 
+            (uuid, razao_social, nome_empresa, cnpj, ramo_atuacao, rua, numero, bairro, cidade, estado, cep)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+
+        await conn.query(sql, [uuid, razao_social, nome_empresa, cnpj, ramo_atuacao, rua, numero, bairro, cidade, estado, cep]);
+
+
+        res.status(200).send({ message: 'Cadastro realizado com sucesso!' });
+
+    } catch (error) {
+
+
+
+        res.status(500).send({ message: 'Erro ao cadastrar empresa' });
+    }
+});
+
+criacao_visitantes.post('/visitantes/cadastro_pessoa', async (req, res) => {
+    try {
+        const session = await check_user(req);
+
+        if (!session || !session.session.acessos.includes(100)) {
+            return res.status(401).send({
+                message: 'Sem permissão!'
+            });
+        }
+
+        const { nome_completo, cpf, data_nascimento, genero, celular, email, empresa } = req.body;
+
+        console.log('Empresa no cadastro de pessoa:', empresa);
+        if (!nome_completo || !cpf || !data_nascimento || !genero || !celular || !email || !empresa) {
+            return res.status(400).send({ message: 'Todos os campos são obrigatórios!' });
+        }
+
+        const [existecpf] = await conn.query('SELECT * FROM visitantes_dados_pessoa WHERE cpf = ?', [cpf]);
+
+        if (existecpf.length > 0) {
+            return res.status(409).send({ message: 'CPF já cadastrado!' });
+        }
+
+        const uuid = uuidv4();
+
+        const sql = `
+            INSERT INTO visitantes_dados_pessoa 
+            (uuid, uuid_empresa, nome_completo, cpf, data_nascimento, genero, celular, email)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+
+        await conn.query(sql, [uuid, empresa.uuid, nome_completo, cpf, data_nascimento, genero, celular, email]);
+
+        res.status(200).send({ message: 'Cadastro realizado com sucesso!' });
+
+    } catch (error) {
+
+        console.error('Erro ao tentar cadastrar pessoa:', error);
+        res.status(500).send({ message: 'Erro ao cadastrar pessoa' });
+
+    }
+
+});
+
+
+
+criacao_visitantes.post('/visitantes/cadastro_visita', async (req, res) => {
+    try {
+        const session = await check_user(req);
+
+        if (!session || !session.session.acessos.includes(100)) {
+            return res.status(401).send({
+                message: 'Sem permissão!'
+            });
+        }
+        console.log(req.body)
+        const { motivo, responsavel_visita, nootebook, epi, fotos, fabrica, estacionamento, observacoes } = req.body;
+
+        console.log('Dados recebidos para cadastro de empresa:', req.body);
+        if (!motivo || !responsavel_visita || !nootebook || !epi || !fotos || !fabrica || !estacionamento) {
+            return res.status(400).send({ message: 'Todos os campos são obrigatórios!' });
+        }
+
+        const uuid = uuidv4();
+
+        const sql = `
+            INSERT INTO visitantes_dados_pessoa 
+            (uuid, uuid_empresa, motivo, responsavel_visita, nootebook, epi, fotos, fabrica, estacionamento, observacoes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+
+        await conn.query(sql, [uuid, empresa.uuid, motivo, responsavel_visita, nootebook, epi, fotos, fabrica, estacionamento, observacoes]);
+
+
+        res.status(200).send({ message: 'Visita cadastrada com sucesso!' });
+
+    } catch (error) {
+
+        console.error('Erro ao tentar cadastrar visita:', error);
+        res.status(500).send({ message: 'Erro ao cadastrar visita' });
+
+    }
+});
+
+export default criacao_visitantes;
